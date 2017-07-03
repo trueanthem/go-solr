@@ -42,6 +42,27 @@ func HTTPPost(path string, data *[]byte, headers [][]string, username, password 
 	return makeRequest(client, req)
 }
 
+// HTTPGet make a GET request to url, headers are optional
+func HTTPGet(url string, headers [][]string, username, password string, transport http.RoundTripper) ([]byte, error) {
+	client := &http.Client{Transport: transport}
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if username != "" && password != "" {
+		req.SetBasicAuth(username, password)
+	}
+
+	if len(headers) > 0 {
+		for i := range headers {
+			req.Header.Add(headers[i][0], headers[i][1])
+		}
+	}
+	return makeRequest(client, req)
+}
+
 func makeRequest(client *http.Client, req *http.Request) ([]byte, error) {
 	req.Header.Set("User-Agent", userAgent)
 
