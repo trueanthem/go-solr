@@ -12,42 +12,19 @@ import (
 
 var userAgent = fmt.Sprintf("Go-solr/%s (+https://github.com/vanng822/go-solr)", VERSION)
 
-var transport = http.Transport{}
-
 // HTTPPost make a POST request to path which also includes domain, headers are optional
-func HTTPPost(path string, data *[]byte, headers [][]string, username, password string) ([]byte, error) {
+func HTTPPost(path string, data *[]byte, headers [][]string, username, password string, transport http.RoundTripper) ([]byte, error) {
 	var (
 		req *http.Request
 		err error
 	)
 
-	client := &http.Client{Transport: &transport}
+	client := &http.Client{Transport: transport}
 	if data == nil {
 		req, err = http.NewRequest("POST", path, nil)
 	} else {
 		req, err = http.NewRequest("POST", path, bytes.NewReader(*data))
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	if username != "" && password != "" {
-		req.SetBasicAuth(username, password)
-	}
-
-	if len(headers) > 0 {
-		for i := range headers {
-			req.Header.Add(headers[i][0], headers[i][1])
-		}
-	}
-	return makeRequest(client, req)
-}
-
-// HTTPGet make a GET request to url, headers are optional
-func HTTPGet(url string, headers [][]string, username, password string) ([]byte, error) {
-	client := &http.Client{Transport: &transport}
-	req, err := http.NewRequest("GET", url, nil)
 
 	if err != nil {
 		return nil, err
@@ -112,36 +89,43 @@ func successStatus(response map[string]interface{}) bool {
 }
 
 type Connection struct {
-	url      *url.URL
-	core     string
-	username string
-	password string
+	url       *url.URL
+	core      string
+	username  string
+	password  string
+	transport http.RoundTripper
 }
 
-// NewConnection will parse solrUrl and return a connection object, solrUrl must be a absolute url or path
-func NewConnection(solrUrl, core string) (*Connection, error) {
-	u, err := url.ParseRequestURI(strings.TrimRight(solrUrl, "/"))
+// NewConnection will parse solrURL and return a connection object, solrURL must be a absolute url or path
+func NewConnection(solrURL, core string, transport http.RoundTripper) (*Connection, error) {
+	u, err := url.ParseRequestURI(strings.TrimRight(solrURL, "/"))
 	if err != nil {
 		return nil, err
 	}
 
-	return &Connection{url: u, core: core}, nil
+	if transport == nil {
+		transport = &http.Transport{}
+	}
+
+	return &Connection{url: u, core: core, transport: transport}, nil
 }
 
-// Set to a new core
+// SetCore sets to a new core
 func (c *Connection) SetCore(core string) {
 	c.core = core
 }
 
+// SetBasicAuth sets basic auth info
 func (c *Connection) SetBasicAuth(username, password string) {
 	c.username = username
 	c.password = password
 }
 
+// Resource retrieves specified resource from server
 func (c *Connection) Resource(source string, params *url.Values) (*[]byte, error) {
 	params.Set("wt", "json")
 	d := []byte(params.Encode())
-	r, err := HTTPPost(fmt.Sprintf("%s/%s/%s", c.url.String(), c.core, source), &d, [][]string{{"Content-Type", " application/x-www-form-urlencoded"}}, c.username, c.password)
+	r, err := HTTPPost(fmt.Sprintf("%s/%s/%s", c.url.String(), c.core, source), &d, [][]string{{"Content-Type", " application/x-www-form-urlencoded"}}, c.username, c.password, c.transport)
 	return &r, err
 
 }
@@ -161,7 +145,7 @@ func (c *Connection) Update(data map[string]interface{}, params *url.Values) (*S
 
 	params.Set("wt", "json")
 
-	r, err := HTTPPost(fmt.Sprintf("%s/%s/update/?%s", c.url.String(), c.core, params.Encode()), b, [][]string{{"Content-Type", "application/json"}}, c.username, c.password)
+	r, err := HTTPPost(fmt.Sprintf("%s/%s/update/?%s", c.url.String(), c.core, params.Encode()), b, [][]string{{"Content-Type", "application/json"}}, c.username, c.password, c.transport)
 
 	if err != nil {
 		return nil, err
