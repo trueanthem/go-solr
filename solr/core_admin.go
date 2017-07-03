@@ -2,14 +2,16 @@ package solr
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 )
 
 type CoreAdmin struct {
-	url      *url.URL
-	username string
-	password string
+	url       *url.URL
+	username  string
+	password  string
+	transport http.RoundTripper
 }
 
 // solrUrl should look like this http://0.0.0.0:8983/solr[/admin/cores] ie /admin/cores will append automatically
@@ -23,7 +25,6 @@ func NewCoreAdmin(solrUrl string) (*CoreAdmin, error) {
 	return &CoreAdmin{url: u}, nil
 }
 
-
 // Set basic auth in case solr require login
 func (ca *CoreAdmin) SetBasicAuth(username, password string) {
 	ca.username = username
@@ -33,7 +34,7 @@ func (ca *CoreAdmin) SetBasicAuth(username, password string) {
 // Method for making GET-request to any relitive path to /admin/ such as /admin/cores or /admin/info/threads
 func (ca *CoreAdmin) Get(path string, params *url.Values) (*SolrResponse, error) {
 	params.Set("wt", "json")
-	r, err := HTTPGet(fmt.Sprintf("%s/admin/%s?%s", ca.url.String(), path, params.Encode()), nil, ca.username, ca.password)
+	r, err := HTTPGet(fmt.Sprintf("%s/admin/%s?%s", ca.url.String(), path, params.Encode()), nil, ca.username, ca.password, ca.transport)
 	if err != nil {
 		return nil, err
 	}
