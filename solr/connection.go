@@ -8,18 +8,19 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 var userAgent = fmt.Sprintf("Go-solr/%s (+https://github.com/vanng822/go-solr)", VERSION)
 
 // HTTPPost make a POST request to path which also includes domain, headers are optional
-func HTTPPost(path string, data *[]byte, headers [][]string, username, password string, transport http.RoundTripper) ([]byte, error) {
+func HTTPPost(path string, data *[]byte, headers [][]string, username, password string, timeout time.Duration) ([]byte, error) {
 	var (
 		req *http.Request
 		err error
 	)
 
-	client := &http.Client{Transport: transport}
+	client := &http.Client{Timeout: timeout}
 	if data == nil {
 		req, err = http.NewRequest("POST", path, nil)
 	} else {
@@ -43,8 +44,8 @@ func HTTPPost(path string, data *[]byte, headers [][]string, username, password 
 }
 
 // HTTPGet make a GET request to url, headers are optional
-func HTTPGet(url string, headers [][]string, username, password string, transport http.RoundTripper) ([]byte, error) {
-	client := &http.Client{Transport: transport}
+func HTTPGet(url string, headers [][]string, username, password string, timeout time.Duration) ([]byte, error) {
+	client := &http.Client{Timeout: timeout}
 	req, err := http.NewRequest("GET", url, nil)
 
 	if err != nil {
@@ -110,25 +111,21 @@ func successStatus(response map[string]interface{}) bool {
 }
 
 type Connection struct {
-	url       *url.URL
-	core      string
-	username  string
-	password  string
-	transport http.RoundTripper
+	url      *url.URL
+	core     string
+	username string
+	password string
+	timeout  time.Duration
 }
 
 // NewConnection will parse solrURL and return a connection object, solrURL must be a absolute url or path
-func NewConnection(solrURL, core string, transport http.RoundTripper) (*Connection, error) {
+func NewConnection(solrURL, core string, timeout time.Duration) (*Connection, error) {
 	u, err := url.ParseRequestURI(strings.TrimRight(solrURL, "/"))
 	if err != nil {
 		return nil, err
 	}
 
-	if transport == nil {
-		transport = &http.Transport{}
-	}
-
-	return &Connection{url: u, core: core, transport: transport}, nil
+	return &Connection{url: u, core: core, timeout: timeout}, nil
 }
 
 // SetCore sets to a new core
@@ -146,7 +143,7 @@ func (c *Connection) SetBasicAuth(username, password string) {
 func (c *Connection) Resource(source string, params *url.Values) (*[]byte, error) {
 	params.Set("wt", "json")
 	d := []byte(params.Encode())
-	r, err := HTTPPost(fmt.Sprintf("%s/%s/%s", c.url.String(), c.core, source), &d, [][]string{{"Content-Type", " application/x-www-form-urlencoded"}}, c.username, c.password, c.transport)
+	r, err := HTTPPost(fmt.Sprintf("%s/%s/%s", c.url.String(), c.core, source), &d, [][]string{{"Content-Type", " application/x-www-form-urlencoded"}}, c.username, c.password, c.timeout)
 	return &r, err
 
 }
@@ -166,7 +163,7 @@ func (c *Connection) Update(data map[string]interface{}, params *url.Values) (*S
 
 	params.Set("wt", "json")
 
-	r, err := HTTPPost(fmt.Sprintf("%s/%s/update/?%s", c.url.String(), c.core, params.Encode()), b, [][]string{{"Content-Type", "application/json"}}, c.username, c.password, c.transport)
+	r, err := HTTPPost(fmt.Sprintf("%s/%s/update/?%s", c.url.String(), c.core, params.Encode()), b, [][]string{{"Content-Type", "application/json"}}, c.username, c.password, c.timeout)
 
 	if err != nil {
 		return nil, err

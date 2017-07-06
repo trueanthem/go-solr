@@ -2,27 +2,27 @@ package solr
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type Schema struct {
-	url       *url.URL
-	core      string
-	username  string
-	password  string
-	transport http.RoundTripper
+	url      *url.URL
+	core     string
+	username string
+	password string
+	timeout  time.Duration
 }
 
 // NewSchema will parse solrUrl and return a schema object, solrUrl must be a absolute url or path
-func NewSchema(solrUrl, core string) (*Schema, error) {
+func NewSchema(solrUrl, core string, timeout time.Duration) (*Schema, error) {
 	u, err := url.ParseRequestURI(strings.TrimRight(solrUrl, "/"))
 	if err != nil {
 		return nil, err
 	}
 
-	return &Schema{url: u, core: core, transport: &http.Transport{}}, nil
+	return &Schema{url: u, core: core, timeout: timeout}, nil
 }
 
 // Set to a new core
@@ -52,9 +52,9 @@ func (s *Schema) Get(path string, params *url.Values) (*SolrResponse, error) {
 	}
 
 	if s.core != "" {
-		r, err = HTTPGet(fmt.Sprintf("%s/%s/schema%s?%s", s.url.String(), s.core, path, params.Encode()), nil, s.username, s.password, s.transport)
+		r, err = HTTPGet(fmt.Sprintf("%s/%s/schema%s?%s", s.url.String(), s.core, path, params.Encode()), nil, s.username, s.password, s.timeout)
 	} else {
-		r, err = HTTPGet(fmt.Sprintf("%s/schema%s?%s", s.url.String(), path, params.Encode()), nil, s.username, s.password, s.transport)
+		r, err = HTTPGet(fmt.Sprintf("%s/schema%s?%s", s.url.String(), path, params.Encode()), nil, s.username, s.password, s.timeout)
 	}
 	if err != nil {
 		return nil, err
@@ -167,9 +167,9 @@ func (s *Schema) Post(path string, data interface{}) (*SolrUpdateResponse, error
 	}
 
 	if s.core != "" {
-		r, err = HTTPPost(fmt.Sprintf("%s/%s/schema/%s?wt=json", s.url.String(), s.core, strings.Trim(path, "/")), b, [][]string{{"Content-Type", "application/json"}}, s.username, s.password, s.transport)
+		r, err = HTTPPost(fmt.Sprintf("%s/%s/schema/%s?wt=json", s.url.String(), s.core, strings.Trim(path, "/")), b, [][]string{{"Content-Type", "application/json"}}, s.username, s.password, s.timeout)
 	} else {
-		r, err = HTTPPost(fmt.Sprintf("%s/schema/%s?wt=json", s.url.String(), strings.Trim(path, "/")), b, [][]string{{"Content-Type", "application/json"}}, s.username, s.password, s.transport)
+		r, err = HTTPPost(fmt.Sprintf("%s/schema/%s?wt=json", s.url.String(), strings.Trim(path, "/")), b, [][]string{{"Content-Type", "application/json"}}, s.username, s.password, s.timeout)
 	}
 	if err != nil {
 		return nil, err
